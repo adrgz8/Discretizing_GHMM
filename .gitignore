@@ -1,3 +1,5 @@
 previous_experiments/
 .DS_Store
 .ipynb_checkpoints
+*.pyc
+Values Results/
