@@ -118,7 +118,7 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
         self.covars_ = covars
         if pre_observations is None:
             self.observations, _ = self.sample(self.sample_size)
-            self.observations_test, _ = self.sample(int(self.sample_size*0.2))
+            self.observations_test, _ = self.sample(int(self.sample_size*0.1))
         else:
             self.observations = pre_observations[0]
             self.observations_test = pre_observations[1]
@@ -142,15 +142,20 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
             r_covars = np.stack(r_covars, axis=0)
             r_covars = self.ordering_vals(covars, r_covars)
 
-            # Initializing transition matrix based on the observations
-            mat = np.zeros((self.n_components, self.n_components))
-            labs = kmeans.labels_
-            for i in range(len(self.observations)-2):
-                idx1, idx2 = labs[i:i+2]
-                mat[idx1][idx2] += 1
-            r_transmat = np.array([mat[i] / mat.sum(axis=1)[i]
-                                   for i in range(self.n_components)])
-            r_transmat = self.ordering_vals(transmat, r_transmat)
+            # # Initializing transition matrix based on the observations
+            # mat = np.zeros((self.n_components, self.n_components))
+            # labs = kmeans.labels_
+            # for i in range(len(self.observations)-2):
+            #     idx1, idx2 = labs[i:i+2]
+            #     mat[idx1][idx2] += 1
+            # r_transmat = np.array([mat[i] / mat.sum(axis=1)[i]
+            #                        for i in range(self.n_components)])
+            # r_transmat = self.ordering_vals(transmat, r_transmat)
+
+            # Initializing randomly transition matrix
+            r_transmat = np.array(
+                [1 / self.n_components] * (self.n_components ** 2)).reshape(
+                (self.n_components, self.n_components))
 
             # Starting the model with the Random initialization
             self.model = Discrete_Model(self.n_components,

@@ -2,12 +2,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from collections import Counter
-from hmm_discretization_ND import Discrete_Model_Optimization
+from hmm_discretization import Discrete_Model_Optimization
 from scipy.stats import qmc
 from torch.distributions import MultivariateNormal
 import random
 
 
+# Unused, replaced by score function in hmmlearn
 def eval_estimates(n_components, obs, m, c):
     dists = [MultivariateNormal(torch.tensor(m[i]), torch.tensor(c[i]))
              for i in range(n_components)]
@@ -18,8 +19,18 @@ def eval_estimates(n_components, obs, m, c):
 
 
 def generate_parameters(n_dim, n_hidden):
-    means_options = np.linspace(-10.0, 10.0, 50)
-    covars_options = np.linspace(0.01, 2.0, 49)
+    """Generates random parameters in a range for testing the
+    Discr. optimization
+
+    Args:
+        n_dim (int): Number of dimensions
+        n_hidden (int): Number of hidden states
+
+    Returns:
+        np.arrays: means, cov. matrix, startprob and transmat
+    """
+    means_options = np.linspace(-10.0, 10.0, 51)
+    covars_options = np.linspace(0.00, 2.0, 21)
     means_sel = random.choices(means_options, k=n_dim * n_hidden)
     means_sel = np.array(means_sel).reshape((n_hidden, n_dim))
     covars_sel = random.choices(covars_options, k=n_dim * n_dim * n_hidden)
@@ -29,16 +40,25 @@ def generate_parameters(n_dim, n_hidden):
     covars_sel = t_covars_sel.detach().numpy()
     if n_hidden == 2:
         startprob = np.array([0.5, 0.5])
-        transmat = np.array([[0.2, 0.8], [0.5, 0.5]])
+        transmat = np.array([[0.8, 0.2], [0.7, 0.3]])
     elif n_hidden == 3:
         startprob = np.array([0.5, 0.2, 0.3])
         transmat = np.array(
-            [[0.2, 0.6, 0.2], [0.5, 0.4, 0.1], [0.15, 0.35, 0.5]])
+            [[0.7, 0.2, 0.1], [0.3, 0.1, 0.6], [0.2, 0.6, 0.2]])
     return means_sel, covars_sel, startprob, transmat
 
 
 def grid_vals(mod_sel):
-    # Ordering the number of times the Discrete observation was selected
+    """Function to order the number of times the Discrete observation
+        is selected
+    Args:
+        mod_sel (hmm Discrete model): Discretized model utilized
+        to  optimize parameters
+
+    Returns:
+        np.arrays: Discrete observations, sizes, discrete sequence,
+        observations
+    """
     counts = Counter(mod_sel.knn_indices)
     for i in range(mod_sel.sample_size):
         counts[i] += 1
@@ -54,6 +74,16 @@ def grid_vals(mod_sel):
 
 
 def plot_grids3D(grid_size, num_obs, mods_saved):
+    """Plot the 3D grids showing the discrete points, the continuous
+    gaussian observations and highlighting the most utilized discrete
+    points.
+
+    Args:
+        grid_size (int): Size of the grid
+        num_obs (int): Number of observations
+        mods_saved (hmm Discrete model): Discretized model utilized
+        to  optimize parameters
+    """
     disc_methods = ['Random', 'Grid', 'LH', 'Sobol', 'Halton']
     fig = plt.figure(figsize=(18, 5))
     title_text = f"Parameters Optimization with 2^{grid_size} discrete" \
@@ -89,11 +119,24 @@ def plot_grids3D(grid_size, num_obs, mods_saved):
         ax.set_yticks([])
         ax.set_xticklabels([])
         ax.set_xticks([])
-    # plt.tight_layout()
+    plt.tight_layout()
     plt.show()
 
 
 def plot_grids2D(grid_size, num_obs, Q_emps, Q_ests, Q_ests_start, mods_saved):
+    """Plot the 2D grids showing the discrete points, the continuous
+    gaussian observations and highlighting the most utilized discrete
+    points. Also, plots the difference between different Q matrices
+
+    Args:
+        grid_size (int): Size of the grid
+        num_obs (int): Number of observations
+        Q_emps (np.array): Q empirical matrix
+        Q_ests (np.array): Q final estimated matrix
+        Q_ests_start (np.array): Q initial estimated matrix
+        mods_saved (hmm Discrete model): Discretized model utilized
+        to  optimize parameters
+    """
     disc_methods = ['Random', 'Grid', 'LH', 'Sobol', 'Halton']
     fig, axes = plt.subplots(ncols=5, nrows=4, figsize=(15, 12))
     title_text = f"Parameters Optimization with 2^{grid_size} discrete" \
@@ -135,52 +178,58 @@ def plot_grids2D(grid_size, num_obs, Q_emps, Q_ests, Q_ests_start, mods_saved):
     plt.show()
 
 
-def plot_scores_perc_discr(scores_all,
-                           grid_perc_all,
-                           grid_size,
-                           num_obs,
-                           log_probs_all,
-                           incl_log_probs=False):
+def plot_metrics(scores,
+                 accs,
+                 discrepancies,
+                 grid_size,
+                 num_obs):
     disc_methods = ['Random', 'Grid', 'LH', 'Sobol', 'Halton']
     loss_functions = ['MSE', 'KLD']
-    if incl_log_probs:
-        _, axes = plt.subplots(ncols=3, figsize=(15, 5))
-    else:
-        _, axes = plt.subplots(ncols=2, figsize=(15, 5))
-    axes[0].plot(scores_all[:5], label=loss_functions[0])
-    axes[0].plot(scores_all[5:], label=loss_functions[1])
+    _, axes = plt.subplots(ncols=3, figsize=(15, 5))
+    axes[0].plot(scores[:5], label=loss_functions[0])
+    axes[0].plot(scores[5:], label=loss_functions[1])
     axes[0].set_xticks(np.arange(len(disc_methods)), disc_methods)
     ax_title = 'Scores for Discretization methods.' \
         f' Size={num_obs}. Grid=2^{grid_size}'
     axes[0].set_title(ax_title, fontsize=10)
     axes[0].set_xlabel('Methods')
-    axes[0].set_ylabel('Score')
+    axes[0].set_ylabel('Log-probability')
     axes[0].legend()
-    axes[1].plot(grid_perc_all[:5], label=loss_functions[0])
-    axes[1].plot(grid_perc_all[5:], label=loss_functions[1])
+    axes[1].plot(accs[:5], label=loss_functions[0])
+    axes[1].plot(accs[5:], label=loss_functions[1])
     axes[1].set_xticks(np.arange(len(disc_methods)), disc_methods)
-    ax_title = 'Discrepancy of Discretization ' \
+    ax_title = 'Accuracy of Discretization ' \
         f'methods. Size={num_obs}. Grid=2^{grid_size}'
     axes[1].set_title(
         ax_title, fontsize=10)
     axes[1].set_xlabel('Methods')
-    axes[1].set_ylabel('Percentage of Discrete points utilized')
+    axes[1].set_ylabel('Accuracy')
     axes[1].legend()
-    if incl_log_probs:
-        axes[2].plot(log_probs_all[:5], label=loss_functions[0])
-        axes[2].plot(log_probs_all[5:], label=loss_functions[1])
-        axes[2].set_xticks(np.arange(len(disc_methods)), disc_methods)
-        ax_title = 'Log-prob for Discretization methods.' \
-            f' Size={num_obs}. Grid=2^{grid_size}'
-        axes[2].set_title(ax_title, fontsize=8)
-        axes[2].set_xlabel('Methods')
-        axes[2].set_ylabel('Log-probability')
-        axes[2].legend()
+    axes[2].plot(discrepancies[:5], label=loss_functions[0])
+    axes[2].plot(discrepancies[5:], label=loss_functions[1])
+    axes[2].set_xticks(np.arange(len(disc_methods)), disc_methods)
+    ax_title = 'Discrepancy of Discretization ' \
+        f'methods. Size={num_obs}. Grid=2^{grid_size}'
+    axes[2].set_title(ax_title, fontsize=8)
+    axes[2].set_xlabel('Methods')
+    axes[2].set_ylabel('Discrepancy')
+    axes[2].legend()
     plt.tight_layout()
     plt.show()
 
 
 def plot_loss(losses_all, grid_size, num_obs):
+    """Plot the average loss of the diferent discretization techniques with
+    different losses.
+
+    Args:
+        losses_all (list): List of losses to plot
+        grid_size (int): Size of the grid
+        num_obs (int): Number of observations
+
+    Returns:
+        list: average of the loss through the epochs
+    """
     disc_methods = ['Random', 'Grid', 'LH', 'Sobol', 'Halton']
     avg_to_plot = list()
     for j in range(len(losses_all)):
@@ -210,7 +259,9 @@ def paper_experiments(sample_experiment,
                       it_experiment=5,
                       lr=0.01,
                       n_epochs=200,
-                      random_init=True):
+                      random_init=True,
+                      log_prob_calc=False,
+                      grid_perc_calc=False):
     n_components = n_hidden
     n_features = n_hidden
     sample_size = sample_experiment
@@ -232,21 +283,30 @@ def paper_experiments(sample_experiment,
                                           covars,
                                           random_init)
     obs_samples = [mod_opt.observations, mod_opt.observations_test]
+    seq_orig = mod_opt.decode(obs_samples[1])[1]
     losses_all = list()
-    log_probs_all = list()
     scores_all = list()
-    grid_perc_all = list()
+    discr_all = list()
+    acc_all = list()
+    mods_saved = list()
+    if log_prob_calc:
+        log_probs_all = list()
+    if grid_perc_calc:
+        grid_perc_all = list()
     if n_dimensions == 2:
         Q_emps = list()
         Q_ests = list()
         Q_ests_start = list()
-    mods_saved = list()
     for loss_function in loss_functions:
         for disc_method in disc_methods:
             losses_met = list()
-            log_probs_met = list()
             scores_met = list()
-            grid_perc_met = list()
+            discr_met = list()
+            acc_met = list()
+            if log_prob_calc:
+                log_probs_met = list()
+            if grid_perc_calc:
+                grid_perc_met = list()
             message = f'Doing: {disc_method} with {loss_function}. ' \
                 f'Sample size={sample_experiment}. Grid size={grid_experiment}'
             print(message)
@@ -270,26 +330,37 @@ def paper_experiments(sample_experiment,
                     Q_ests_start.append(Q_est_start)
                 mods_saved.append(mod_opt)
                 params, losses = mod_opt.training(loss_function, verbose=False)
-                avg_log_prob = eval_estimates(
-                    n_components,
-                    torch.tensor(mod_opt.observations_test),
-                    params[0],
-                    params[1])
                 losses_met.append(losses)
-                log_probs_met.append(avg_log_prob)
                 scores_met.append(mod_opt.score(obs_samples[1]))
-                # grid_perc = len(np.unique(
-                #     mod_opt.knn_indices)) / mod_opt.grid_size
-                grid_scale = qmc.scale(mod_opt.discrete_seq,
-                                       mod_opt.mins,
-                                       mod_opt.maxs,
-                                       reverse=True)
-                grid_perc = qmc.discrepancy(grid_scale)
-                grid_perc_met.append(grid_perc)
+                seq_test = mod_opt.decode(obs_samples[1])[1]
+                same_state = np.where(seq_orig == seq_test, 1, 0)
+                hidd_accuracy = same_state.sum() / len(same_state)
+                acc_met.append(hidd_accuracy)
+                discr_scale = qmc.scale(mod_opt.discrete_seq,
+                                        mod_opt.mins,
+                                        mod_opt.maxs,
+                                        reverse=True)
+                discr = qmc.discrepancy(discr_scale)
+                discr_met.append(discr)
+                if log_prob_calc:
+                    avg_log_prob = eval_estimates(
+                        n_components,
+                        torch.tensor(mod_opt.observations_test),
+                        params[0],
+                        params[1])
+                    log_probs_met.append(avg_log_prob)
+                if grid_perc_calc:
+                    grid_perc = len(np.unique(
+                        mod_opt.knn_indices)) / mod_opt.grid_size
+                    grid_perc_met.append(grid_perc)
             losses_all.append(losses_met)
-            log_probs_all.append(np.mean(log_probs_met))
             scores_all.append(np.mean(scores_met))
-            grid_perc_all.append(np.mean(grid_perc_met))
+            discr_all.append(np.mean(discr_met))
+            acc_all.append(np.mean(acc_met))
+            if log_prob_calc:
+                log_probs_all.append(np.mean(log_probs_met))
+            if grid_perc_calc:
+                grid_perc_all.append(np.mean(grid_perc_met))
             if n_dimensions == 2:
                 Q_emp, Q_est = mod_opt.plot_initial(True)
                 Q_emps.append(Q_emp)
@@ -303,11 +374,11 @@ def paper_experiments(sample_experiment,
                      mods_saved)
     elif (n_dimensions == 3) & (it_experiment == 1):
         plot_grids3D(grid_experiment, sample_experiment, mods_saved)
-    plot_scores_perc_discr(scores_all,
-                           grid_perc_all,
-                           grid_experiment,
-                           sample_experiment,
-                           log_probs_all)
+    plot_metrics(scores_all,
+                 acc_all,
+                 discr_all,
+                 grid_experiment,
+                 sample_experiment)
     losses_avg = plot_loss(losses_all, grid_experiment, sample_experiment)
     min_loss = [losses_avg[i][-1] for i in range(len(losses_avg))]
-    return min_loss, log_probs_all, scores_all, grid_perc_all, mods_saved
+    return min_loss, scores_all, acc_all, discr_all, mods_saved
