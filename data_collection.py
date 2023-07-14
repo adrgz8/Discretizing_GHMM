@@ -331,6 +331,8 @@ def paper_experiments(sample_experiment,
                 mods_saved.append(mod_opt)
                 params, losses = mod_opt.training(loss_function, verbose=False)
                 losses_met.append(losses)
+                # Modified to get score of train set instead of test
+                # scores_met.append(mod_opt.score(obs_samples[0][:30]))
                 scores_met.append(mod_opt.score(obs_samples[1]))
                 seq_test = mod_opt.decode(obs_samples[1])[1]
                 same_state = np.where(seq_orig == seq_test, 1, 0)
