@@ -3,3 +3,4 @@ previous_experiments/
 .ipynb_checkpoints
 Values Results/
 *.pyc
+testing_values.ipynb
