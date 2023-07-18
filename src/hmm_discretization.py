@@ -142,16 +142,6 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
             r_covars = np.stack(r_covars, axis=0)
             r_covars = self.ordering_vals(covars, r_covars)
 
-            # # Initializing transition matrix based on the observations
-            # mat = np.zeros((self.n_components, self.n_components))
-            # labs = kmeans.labels_
-            # for i in range(len(self.observations)-2):
-            #     idx1, idx2 = labs[i:i+2]
-            #     mat[idx1][idx2] += 1
-            # r_transmat = np.array([mat[i] / mat.sum(axis=1)[i]
-            #                        for i in range(self.n_components)])
-            # r_transmat = self.ordering_vals(transmat, r_transmat)
-
             # Initializing randomly transition matrix
             r_transmat = np.array(
                 [1 / self.n_components] * (self.n_components ** 2)).reshape(
@@ -330,7 +320,6 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
                          color='red',
                          alpha=0.5,
                          s=sizes)
-            # plt.legend()
             plt.show()
         else:
             pass
@@ -366,7 +355,7 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
         return Q_emp
 
     # Fitting the model
-    def training(self, loss_function='MSE', verbose=False):
+    def training(self, loss_function='MSE'):
         loss_acum = list()
         Q_emp = self.compute_empirical_Q(to_torch=True)
         optimizer = optim.Adam(params=self.model.parameters(), lr=self.lr)
@@ -379,67 +368,33 @@ class Discrete_Model_Optimization(hmm.GaussianHMM):
             print('Choose different Loss function')
             return
         for i in range(self.epochs):
-            try:
-                optimizer.zero_grad()
-                if loss_function == 'MSE':
-                    loss = loss_fun(self.model(t_discrete_seq), Q_emp)
-                else:
-                    loss = loss_fun(
-                        nn.functional.log_softmax(
-                            self.model(t_discrete_seq),
-                            dim=1),
-                        nn.functional.log_softmax(
-                            Q_emp,
-                            dim=1)
-                        )
-                loss.backward()
-                optimizer.step()
-                val_loss = np.round(loss.detach().numpy(), 6)
-                if i % int(self.epochs / 10) == 0:
-                    (self.means_,
-                     self.covars_,
-                     self.startprob_,
-                     self.transmat_,) = self.model.retrieve_parameters()
-                    if verbose:
-                        print_S_matrix = np.dot(
-                            np.diag(self.startprob_),
-                            self.transmat_
-                        )
-                        print(f"Epoch: {i} / {self.epochs} | Loss: {val_loss}")
-                        print(
-                            "\n" "Means: " "\n", self.means_, "\n"
-                            "\n" "Covars: " "\n", self.covars_, "\n"
-                            "\n" "S_matrix: " "\n", print_S_matrix, "\n"
-                            "\n" "Start prob: " "\n", self.startprob_, "\n"
-                            "\n" "Trans mat: " "\n", self.transmat_)
-                        print('-' * 50)
-                    self.lr *= 0.9
-                    optimizer = optim.Adam(
-                        params=self.model.parameters(),
-                        lr=self.lr
+            optimizer.zero_grad()
+            if loss_function == 'MSE':
+                loss = loss_fun(self.model(t_discrete_seq), Q_emp)
+            else:
+                loss = loss_fun(
+                    nn.functional.log_softmax(
+                        self.model(t_discrete_seq),
+                        dim=1),
+                    nn.functional.log_softmax(
+                        Q_emp,
+                        dim=1)
                     )
-                if loss_function == 'MSE':
-                    loss_acum.append(val_loss)
-                else:
-                    loss_acum.append(np.exp(val_loss))
-            except KeyboardInterrupt:
-                if verbose:
-                    print_S_matrix = np.dot(
-                        np.diag(self.startprob_),
-                        self.transmat_
-                    )
-                    print(f"After {i} epochs, values are: ")
-                    print(
-                        "Means: " "\n", self.means_, "\n"
-                        "Covars: " "\n", self.covars_, "\n"
-                        "S_matrix: " "\n", print_S_matrix
-                    )
-                    print('-' * 50)
-                plt.plot(np.arange(len(loss_acum)), loss_acum)
-                plt.show()
-                return self.model.retrieve_parameters(), loss_acum
-
-        if verbose:
-            plt.plot(np.arange(len(loss_acum)), loss_acum)
-            plt.show()
+            loss.backward()
+            optimizer.step()
+            val_loss = np.round(loss.detach().numpy(), 6)
+            if i % int(self.epochs / 10) == 0:
+                (self.means_,
+                    self.covars_,
+                    self.startprob_,
+                    self.transmat_,) = self.model.retrieve_parameters()
+                self.lr *= 0.9
+                optimizer = optim.Adam(
+                    params=self.model.parameters(),
+                    lr=self.lr
+                )
+            if loss_function == 'MSE':
+                loss_acum.append(val_loss)
+            else:
+                loss_acum.append(np.exp(val_loss))
         return self.model.retrieve_parameters(), loss_acum

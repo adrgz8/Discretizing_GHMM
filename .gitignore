@@ -1,6 +1,7 @@
 previous_experiments/
 .DS_Store
-.ipynb_checkpoints
+*.ipynb_checkpoints
 Values Results/
 *.pyc
 testing_values.ipynb
+*__pycache__

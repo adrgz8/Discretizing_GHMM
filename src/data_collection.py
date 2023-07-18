@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from collections import Counter
-from hmm_discretization import Discrete_Model_Optimization
+from src.hmm_discretization import Discrete_Model_Optimization
 from scipy.stats import qmc
 from torch.distributions import MultivariateNormal
 import random
@@ -329,7 +329,7 @@ def paper_experiments(sample_experiment,
                     _, Q_est_start = mod_opt.plot_initial(True)
                     Q_ests_start.append(Q_est_start)
                 mods_saved.append(mod_opt)
-                params, losses = mod_opt.training(loss_function, verbose=False)
+                params, losses = mod_opt.training(loss_function)
                 losses_met.append(losses)
                 # Modified to get score of train set instead of test
                 # scores_met.append(mod_opt.score(obs_samples[0][:30]))
